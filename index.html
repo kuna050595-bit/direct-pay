@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Рассрочка напрямую</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap');
+    body{margin:0;background:linear-gradient(180deg,#edf4ff,#f8fafc);font-family:'Manrope',sans-serif;color:#0f172a}
+    .app{max-width:460px;min-height:100vh;margin:0 auto;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.12);overflow:hidden}
+    .screen{display:none;min-height:100vh;padding:20px;flex-direction:column}.screen.active{display:flex}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:24px;box-shadow:0 14px 30px rgba(15,23,42,.06)}
+    .primary{background:linear-gradient(135deg,#0f62fe,#1d4ed8);color:#fff;border:none;border-radius:16px;padding:15px;font-weight:800;width:100%;cursor:pointer;font-size:15px;font-family:inherit}
+    .primary:disabled{opacity:0.6;cursor:not-allowed}
+    .secondary{background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-radius:16px;padding:14px;font-weight:700;width:100%;cursor:pointer;font-size:15px;font-family:inherit}
+    .ghost{background:#f1f5f9;color:#0f172a;border:none;border-radius:12px;padding:9px 12px;font-weight:700;cursor:pointer;font-family:inherit}
+    .input{width:100%;border:none;outline:none;background:#f1f5f9;border-radius:16px;padding:14px 15px;font:inherit;box-sizing:border-box;font-size:15px}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase}
+    .badge-realty{background:#dbeafe;color:#1d4ed8}.badge-auto{background:#fef3c7;color:#b45309}
+    .tabbar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 16px 20px;background:#fff;border-top:1px solid #e2e8f0;margin:auto -20px -20px}
+    .tab{font-size:11px;text-align:center;color:#94a3b8;font-weight:700;cursor:pointer}.tab.active{color:#0f62fe}.tab i{font-size:18px;display:block;margin-bottom:6px}
+    .noscroll{overflow:auto;scrollbar-width:none}.noscroll::-webkit-scrollbar{display:none}
+    .err{color:#ef4444;font-size:13px;font-weight:700;text-align:center;margin-top:8px;min-height:20px}
+    .tabs-auth{display:flex;gap:4px;background:#f1f5f9;border-radius:14px;padding:4px;margin-bottom:20px}
+    .tab-auth{flex:1;padding:9px;border:none;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;background:transparent;color:#94a3b8;font-family:inherit}
+    .tab-auth.active{background:#fff;color:#0f62fe;box-shadow:0 2px 8px rgba(15,23,42,.08)}
+    .stars{color:#f59e0b;font-size:13px}
+    .listing-img{width:100%;height:160px;object-fit:cover;background:#f1f5f9}
+    .chip{display:inline-flex;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:700;background:#f1f5f9;color:#475569;cursor:pointer;white-space:nowrap}
+    .chip.active{background:#0f62fe;color:#fff}
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- WELCOME -->
+  <section id="welcome" class="screen active justify-center text-center">
+    <div class="w-28 h-28 rounded-[34px] mx-auto mb-8 flex items-center justify-center shadow-2xl bg-[linear-gradient(135deg,#0f62fe,#14b8a6)]">
+      <i class="fa-solid fa-handshake text-white text-5xl"></i>
+    </div>
+    <p class="text-xs font-black uppercase tracking-[0.35em] text-blue-600 mb-3">Рассрочка</p>
+    <h1 class="text-4xl font-black leading-tight mb-4">Квартиры и авто в рассрочку напрямую</h1>
+    <p class="text-slate-500 leading-relaxed px-6 mb-10">Без банка и кредитной истории. Договор, график платежей и напоминания — всё в одном месте.</p>
+    <div class="space-y-3">
+      <button class="primary" onclick="go('login')">Войти / Зарегистрироваться</button>
+      <button class="secondary" onclick="loadListings();go('feed')">Смотреть объявления</button>
+    </div>
+  </section>
+
+  <!-- LOGIN -->
+  <section id="login" class="screen justify-center">
+    <button class="w-11 h-11 rounded-2xl bg-slate-50 mb-8 self-start" onclick="go('welcome')"><i class="fa-solid fa-arrow-left"></i></button>
+    <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mb-6"><i class="fa-solid fa-handshake"></i></div>
+    <h2 class="text-3xl font-black mb-6">Добро пожаловать</h2>
+    <div class="tabs-auth">
+      <button class="tab-auth active" id="tabLogin" onclick="switchTab('login')">Войти</button>
+      <button class="tab-auth" id="tabRegister" onclick="switchTab('register')">Регистрация</button>
+    </div>
+    <div class="space-y-3" id="registerExtra" style="display:none">
+      <input id="authPhone" class="input" type="tel" placeholder="Телефон (+7 700 000 00 00)">
+    </div>
+    <div class="space-y-3 mt-3">
+      <input id="authEmail" class="input" type="email" placeholder="Email">
+      <input id="authPassword" class="input" type="password" placeholder="Пароль (мин. 6 символов)" onkeydown="if(event.key==='Enter')submitAuth()">
+    </div>
+    <p id="authErr" class="err"></p>
+    <button class="primary mt-4" id="authBtn" onclick="submitAuth()">Войти</button>
+  </section>
+
+  <!-- FEED (витрина) -->
+  <section id="feed" class="screen">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <p class="text-2xl font-black">Объявления</p>
+        <p class="text-xs text-slate-400">Рассрочка напрямую от собственников</p>
+      </div>
+      <button class="w-11 h-11 rounded-2xl bg-slate-50" id="feedAuthBtn" onclick="go('login')"><i class="fa-solid fa-user"></i></button>
+    </div>
+    <div class="flex gap-2 mb-4 overflow-auto noscroll">
+      <div class="chip active" id="catAll" onclick="setCategory('all')">Все</div>
+      <div class="chip" id="catRealty" onclick="setCategory('realty')">Недвижимость</div>
+      <div class="chip" id="catAuto" onclick="setCategory('auto')">Авто</div>
+    </div>
+    <div id="listingsBox" class="flex-1 noscroll space-y-4"></div>
+    <div class="tabbar">
+      <div class="tab active" onclick="loadListings();go('feed')"><i class="fa-solid fa-house"></i>Витрина</div>
+      <div class="tab" onclick="requireAuth(()=>{loadMyDeals();go('mydeals')})"><i class="fa-solid fa-file-contract"></i>Сделки</div>
+      <div class="tab" onclick="requireAuth(()=>{go('createListing')})"><i class="fa-solid fa-plus"></i>Разместить</div>
+      <div class="tab" onclick="requireAuth(()=>{loadProfile();go('profile')})"><i class="fa-solid fa-user"></i>Профиль</div>
+    </div>
+  </section>
+
+  <!-- LISTING DETAIL -->
+  <section id="listingDetail" class="screen">
+    <div class="flex items-center justify-between mb-5">
+      <button class="w-11 h-11 rounded-2xl bg-slate-50" onclick="go('feed')"><i class="fa-solid fa-arrow-left"></i></button>
+      <p class="font-black">Объявление</p>
+      <div class="w-11"></div>
+    </div>
+    <div id="listingDetailBody" class="flex-1 noscroll"></div>
+  </section>
+
+  <!-- CREATE LISTING -->
+  <section id="createListing" class="screen">
+    <button class="w-11 h-11 rounded-2xl bg-slate-50 mb-4" onclick="go('feed')"><i class="fa-solid fa-arrow-left"></i></button>
+    <h2 class="text-2xl font-black mb-2">Новое объявление</h2>
+    <p class="text-sm text-slate-500 mb-6">Заполните условия рассрочки для покупателей</p>
+    <div class="flex-1 noscroll space-y-4 pb-4">
+      <div class="flex gap-2">
+        <button id="lCatRealty" class="chip active flex-1 text-center" onclick="setListingCategory('realty')">Недвижимость</button>
+        <button id="lCatAuto" class="chip flex-1 text-center" onclick="setListingCategory('auto')">Авто</button>
+      </div>
+      <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Название</label><input id="lTitle" class="input" placeholder="Например: 2-комн. квартира, 60м²"></div>
+      <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Город</label><input id="lCity" class="input" placeholder="Астана"></div>
+      <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Описание</label><textarea id="lDesc" rows="3" class="input" placeholder="Детали объекта"></textarea></div>
+      <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Полная цена, ₸</label><input id="lPrice" type="number" class="input" placeholder="6500000" oninput="recalcListing()"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Первый взнос, ₸</label><input id="lDown" type="number" class="input" placeholder="1500000" oninput="recalcListing()"></div>
+        <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Срок, мес</label><input id="lMonths" type="number" class="input" placeholder="10" oninput="recalcListing()"></div>
+      </div>
+      <div class="card p-4 bg-blue-50 border-blue-100">
+        <p class="text-sm text-blue-700">Ежемесячный платёж: <b id="lMonthlyPreview">—</b></p>
+      </div>
+      <div>
+        <label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Фото</label>
+        <div id="lPhotoArea" class="bg-slate-50 rounded-2xl p-4 text-center cursor-pointer border-2 border-dashed border-slate-200" onclick="document.getElementById('lPhotoInput').click()">
+          <i class="fa-solid fa-camera text-slate-400 text-2xl mb-2 block"></i>
+          <p class="text-sm text-slate-400 font-bold">Нажмите чтобы добавить фото</p>
+        </div>
+        <input id="lPhotoInput" type="file" accept="image/*" multiple class="hidden" onchange="previewListingPhotos(this)">
+        <div id="lPhotoPreview" class="grid grid-cols-3 gap-2 mt-3"></div>
+      </div>
+    </div>
+    <button class="primary" onclick="publishListing()">Опубликовать объявление</button>
+  </section>
+
+  <!-- MY DEALS -->
+  <section id="mydeals" class="screen">
+    <div class="flex items-center justify-between mb-5">
+      <button class="w-11 h-11 rounded-2xl bg-slate-50" onclick="go('feed')"><i class="fa-solid fa-arrow-left"></i></button>
+      <p class="font-black text-xl">Мои сделки</p>
+      <div class="w-11"></div>
+    </div>
+    <div id="dealsBox" class="flex-1 noscroll space-y-4"></div>
+  </section>
+
+  <!-- DEAL DETAIL (график платежей) -->
+  <section id="dealDetail" class="screen">
+    <div class="flex items-center justify-between mb-5">
+      <button class="w-11 h-11 rounded-2xl bg-slate-50" onclick="loadMyDeals();go('mydeals')"><i class="fa-solid fa-arrow-left"></i></button>
+      <p class="font-black">Договор</p>
+      <button class="w-11 h-11 rounded-2xl bg-slate-50" onclick="downloadDealContract()"><i class="fa-solid fa-download"></i></button>
+    </div>
+    <div id="dealDetailBody" class="flex-1 noscroll"></div>
+  </section>
+
+  <!-- CREATE DEAL (offer rassrochka to a buyer) -->
+  <section id="createDeal" class="screen">
+    <button class="w-11 h-11 rounded-2xl bg-slate-50 mb-4" onclick="go('listingDetail')"><i class="fa-solid fa-arrow-left"></i></button>
+    <h2 class="text-2xl font-black mb-2">Оформить рассрочку</h2>
+    <p class="text-sm text-slate-500 mb-6">Заполните данные покупателя и условия</p>
+    <div class="flex-1 noscroll space-y-4 pb-4">
+      <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Телефон покупателя</label><input id="dBuyerPhone" class="input" placeholder="+7 700 000 00 00"></div>
+      <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">ФИО покупателя</label><input id="dBuyerName" class="input" placeholder="Имя Фамилия"></div>
+      <div class="card p-4 bg-slate-50">
+        <p class="text-sm text-slate-500">Условия будут взяты из объявления</p>
+        <div id="dDealSummary" class="mt-2 text-sm"></div>
+      </div>
+      <div><label class="text-[11px] uppercase tracking-[0.22em] font-black text-slate-400 mb-2 block ml-2">Дата начала</label><input id="dStartDate" type="date" class="input"></div>
+    </div>
+    <button class="primary" onclick="goToContractGen()">Перейти к договору</button>
+  </section>
+
+  <!-- CONTRACT GENERATION -->
+  <section id="contractGen" class="screen">
+    <div class="flex items-center justify-between mb-5">
+      <button class="w-11 h-11 rounded-2xl bg-slate-50" onclick="go('createDeal')"><i class="fa-solid fa-arrow-left"></i></button>
+      <p class="font-black">Договор</p>
+      <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-file-contract"></i></div>
+    </div>
+    <div id="contractChoice" class="card p-5 mb-4">
+      <p class="font-black mb-1">Составьте договор рассрочки</p>
+      <p class="text-sm text-slate-500 mb-4">Юридически грамотный документ для обеих сторон.</p>
+      <button onclick="generateAIContract()" class="w-full flex items-center gap-4 p-4 bg-blue-50 rounded-2xl text-left">
+        <div class="w-12 h-12 bg-blue-600 rounded-2xl text-white flex items-center justify-center"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <div class="flex-1">
+          <p class="font-black text-blue-900">Составить с ИИ</p>
+          <p class="text-xs text-blue-600 mt-1">По данным объекта и графику платежей</p>
+        </div>
+      </button>
+    </div>
+    <div id="contractLoading" class="hidden card p-8 mb-4 text-center">
+      <div class="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <p class="font-black">Составляем договор...</p>
+    </div>
+    <div id="contractResult" class="hidden card p-5 mb-4 flex-1 noscroll">
+      <div id="contractBody" class="text-sm text-slate-700 whitespace-pre-line leading-relaxed"></div>
+    </div>
+    <div id="contractActions" class="hidden space-y-3 mt-4">
+      <button onclick="payServiceFee()" class="primary">Оплатить и активировать сделку</button>
+    </div>
+  </section>
+
+  <!-- SERVICE FEE PAYMENT -->
+  <section id="serviceFee" class="screen justify-center">
+    <button class="w-11 h-11 rounded-2xl bg-slate-50 mb-8 self-start" onclick="go('contractGen')"><i class="fa-solid fa-arrow-left"></i></button>
+    <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl mb-6"><i class="fa-solid fa-file-check"></i></div>
+    <h2 class="text-2xl font-black mb-2">Активация сделки</h2>
+    <p class="text-sm text-slate-500 mb-6">Оформление договора и подключение напоминаний о платежах</p>
+    <div class="card p-5 mb-4">
+      <div class="flex justify-between items-baseline mb-2">
+        <span class="text-sm text-slate-500">Оформление договора</span>
+        <span class="text-xl font-black">100 000 ₸</span>
+      </div>
+      <div class="flex justify-between items-baseline">
+        <span class="text-sm text-slate-500">Напоминания о платежах</span>
+        <span class="text-sm font-black">1 000 ₸/мес</span>
+      </div>
+    </div>
+    <button class="primary" onclick="confirmDealCreation()">Подтвердить оплату 100 000 ₸</button>
+    <p class="text-xs text-slate-400 text-center mt-3">Сервис не участвует в переводах между сторонами сделки</p>
+  </section>
+
+  <!-- PROFILE -->
+  <section id="profile" class="screen">
+    <div class="flex items-center justify-between mb-6">
+      <button class="w-11 h-11 rounded-2xl bg-slate-50" onclick="go('feed')"><i class="fa-solid fa-arrow-left"></i></button>
+      <p class="font-black text-xl">Профиль</p>
+      <div class="w-11"></div>
+    </div>
+    <div id="profileBody" class="flex-1 noscroll"></div>
+    <button class="secondary text-red-500 border-red-100 mt-3" onclick="logout()"><i class="fa-solid fa-right-from-bracket mr-2"></i>Выйти</button>
+  </section>
+
+</div>
+
+<div id="loader" class="fixed inset-0 bg-slate-950/85 hidden items-center justify-center z-50 p-10">
+  <div class="text-center"><div class="w-20 h-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div><h3 id="loaderTitle" class="text-white font-black text-xl mb-2">Загрузка...</h3></div>
+</div>
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-bold px-4 py-3 rounded-2xl shadow-2xl whitespace-nowrap"></div>
+
+<script>
+  const SUPABASE_URL = 'https://rnimbshvrvsdhewecovu.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_CUf8XvPEHw6K56zix0adNQ_8VBxDEPk';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let currentUser = null, currentCategory = 'all', currentListing = null, currentDealDraft = null, currentDealView = null;
+  let listingPendingPhotos = [];
+
+  function go(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0)}
+  function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.add('hidden'),2500)}
+  function spin(on,title=''){const l=document.getElementById('loader');l.style.display=on?'flex':'none';if(title)document.getElementById('loaderTitle').textContent=title}
+  function sum(v){return `${Number(v||0).toLocaleString('ru-RU')} ₸`}
+
+  function requireAuth(cb){ if(!currentUser){ toast('Войдите чтобы продолжить'); go('login'); return; } cb(); }
+
+  // ─── AUTH ─────────────────────────────────────────
+  function switchTab(mode){
+    window._authMode=mode;
+    document.getElementById('tabLogin').classList.toggle('active',mode==='login');
+    document.getElementById('tabRegister').classList.toggle('active',mode==='register');
+    document.getElementById('registerExtra').style.display = mode==='register' ? 'block':'none';
+    document.getElementById('authBtn').textContent = mode==='login' ? 'Войти':'Зарегистрироваться';
+    document.getElementById('authErr').textContent='';
+  }
+
+  async function submitAuth(){
+    const email=document.getElementById('authEmail').value.trim();
+    const password=document.getElementById('authPassword').value;
+    const mode = window._authMode||'login';
+    if(!email||!password){document.getElementById('authErr').textContent='Заполните все поля';return}
+    if(password.length<6){document.getElementById('authErr').textContent='Пароль минимум 6 символов';return}
+    document.getElementById('authErr').textContent='';
+    const btn=document.getElementById('authBtn');btn.disabled=true;
+    let result;
+    if(mode==='login'){
+      result=await sb.auth.signInWithPassword({email,password});
+    } else {
+      result=await sb.auth.signUp({email,password});
+    }
+    btn.disabled=false;
+    const{data,error}=result;
+    if(error){document.getElementById('authErr').textContent=error.message;return}
+    if(mode==='register'&&data?.user&&!data?.session){
+      toast('Аккаунт создан! Теперь войдите.');
+      switchTab('login');return;
+    }
+    currentUser=data.user||data?.session?.user;
+    if(mode==='register'){
+      const phone=document.getElementById('authPhone').value.trim();
+      if(phone) await sb.from('profiles').update({phone}).eq('id',currentUser.id);
+    }
+    onLogin();
+  }
+
+  function onLogin(){
+    document.getElementById('feedAuthBtn').innerHTML='<i class="fa-solid fa-user-check"></i>';
+    loadListings();
+    go('feed');
+    toast('Добро пожаловать!');
+  }
+
+  async function logout(){await sb.auth.signOut();currentUser=null;document.getElementById('feedAuthBtn').innerHTML='<i class="fa-solid fa-user"></i>';go('welcome');toast('Вы вышли')}
+
+  // ─── LISTINGS (FEED) ────────────────────────────────
+  async function loadListings(){
+    const{data}=await sb.from('listings').select('*').eq('status','active').order('created_at',{ascending:false});
+    renderListings(data||[]);
+  }
+
+  function setCategory(cat){
+    currentCategory=cat;
+    ['All','Realty','Auto'].forEach(c=>{
+      document.getElementById('cat'+c).classList.toggle('active', c.toLowerCase()===cat || (cat==='all'&&c==='All'));
+    });
+    loadListings();
+  }
+
+  function renderListings(listings){
+    const filtered = currentCategory==='all' ? listings : listings.filter(l=>l.category===currentCategory);
+    const box=document.getElementById('listingsBox');
+    if(!filtered.length){
+      box.innerHTML='<div class="py-16 text-center"><div class="w-16 h-16 rounded-3xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-inbox text-2xl"></i></div><p class="font-black mb-1">Пока нет объявлений</p><p class="text-sm text-slate-500">Будьте первым, кто разместит здесь объект.</p></div>';
+      return;
+    }
+    box.innerHTML='';
+    filtered.forEach(l=>{
+      const card=document.createElement('div');
+      card.className='card overflow-hidden cursor-pointer';
+      card.onclick=()=>openListing(l.id);
+      const img = (l.photo_urls&&l.photo_urls[0]) ? l.photo_urls[0] : 'https://api.dicebear.com/7.x/shapes/svg?seed='+l.id;
+      const catLabel = l.category==='realty' ? 'Недвижимость' : 'Авто';
+      const catClass = l.category==='realty' ? 'badge-realty' : 'badge-auto';
+      card.innerHTML=`
+        <img src="${img}" class="listing-img">
+        <div class="p-4">
+          <span class="badge ${catClass} mb-2">${catLabel}</span>
+          <p class="font-black text-base truncate">${l.title}</p>
+          <p class="text-xs text-slate-400 mt-1">${l.city||''}</p>
+          <div class="flex justify-between items-end mt-3">
+            <div>
+              <p class="text-lg font-black text-blue-600">${sum(l.price)}</p>
+              <p class="text-xs text-slate-500 mt-1">Взнос ${sum(l.down_payment)} · ${l.months} мес по ${sum(l.monthly_payment)}</p>
+            </div>
+          </div>
+        </div>`;
+      box.appendChild(card);
+    });
+  }
+
+  async function openListing(id){
+    const{data:l}=await sb.from('listings').select('*').eq('id',id).single();
+    if(!l) return;
+    currentListing=l;
+    const{data:seller}=await sb.from('profiles').select('*').eq('id',l.seller_id).single();
+    const photosHtml = (l.photo_urls&&l.photo_urls.length)
+      ? '<div class="grid grid-cols-3 gap-2 mb-4">'+l.photo_urls.map(u=>'<img src="'+u+'" class="w-full h-24 object-cover rounded-xl">').join('')+'</div>'
+      : '<img src="https://api.dicebear.com/7.x/shapes/svg?seed='+l.id+'" class="listing-img rounded-2xl mb-4">';
+    const catLabel = l.category==='realty' ? 'Недвижимость' : 'Авто';
+    const ratingStars = '★'.repeat(Math.round(seller?.rating||5)) + '☆'.repeat(5-Math.round(seller?.rating||5));
+    let actionHtml = '';
+    if(currentUser && currentUser.id === l.seller_id){
+      actionHtml = '<button onclick="requireAuth(()=>{prepCreateDeal()})" class="primary">Оформить рассрочку покупателю</button>';
+    } else if(currentUser) {
+      actionHtml = '<button onclick="revealContact()" class="primary"><i class="fa-solid fa-phone mr-2"></i>Показать контакт продавца</button><div id="sellerContact" class="hidden card p-4 mt-3 bg-emerald-50 border-emerald-100 text-center font-black text-emerald-700"></div>';
+    } else {
+      actionHtml = '<button onclick="go(\'login\')" class="primary">Войдите чтобы увидеть контакт</button>';
+    }
+    document.getElementById('listingDetailBody').innerHTML = `
+      ${photosHtml}
+      <span class="badge ${l.category==='realty'?'badge-realty':'badge-auto'} mb-3">${catLabel}</span>
+      <h2 class="text-2xl font-black mb-1">${l.title}</h2>
+      <p class="text-sm text-slate-400 mb-4">${l.city||''}</p>
+      <div class="card p-5 mb-4">
+        <div class="flex justify-between text-sm mb-2"><span class="text-slate-500">Полная цена</span><span class="font-black">${sum(l.price)}</span></div>
+        <div class="flex justify-between text-sm mb-2"><span class="text-slate-500">Первый взнос</span><span class="font-black">${sum(l.down_payment)}</span></div>
+        <div class="flex justify-between text-sm mb-2"><span class="text-slate-500">Срок</span><span class="font-black">${l.months} месяцев</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-500">Ежемесячно</span><span class="font-black text-blue-600">${sum(l.monthly_payment)}</span></div>
+      </div>
+      <div class="card p-4 mb-4">
+        <p class="text-sm text-slate-600">${l.description||'Без описания'}</p>
+      </div>
+      <div class="card p-4 mb-5 flex items-center gap-3">
+        <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center"><i class="fa-solid fa-user text-slate-400"></i></div>
+        <div class="flex-1">
+          <p class="font-black text-sm">Продавец</p>
+          <p class="stars">${ratingStars} <span class="text-slate-400 text-xs">(${seller?.total_deals||0} сделок)</span></p>
+        </div>
+      </div>
+      ${actionHtml}
+    `;
+    go('listingDetail');
+  }
+
+  async function revealContact(){
+    if(!currentListing) return;
+    const phone = document.getElementById('listingDetailBody');
+    // create lead record
+    await sb.from('leads').upsert({listing_id:currentListing.id, buyer_id:currentUser.id, buyer_phone:''}, {onConflict:'listing_id,buyer_id'});
+    const{data:seller}=await sb.from('profiles').select('phone').eq('id',currentListing.seller_id).single();
+    const box = document.getElementById('sellerContact');
+    box.classList.remove('hidden');
+    box.innerHTML = '<i class="fa-solid fa-phone mr-2"></i>'+(seller?.phone || 'Телефон не указан, напишите через профиль');
+    toast('Контакт открыт');
+  }
+
+  // ─── CREATE LISTING ─────────────────────────────────
+  let listingCategory='realty';
+  function setListingCategory(cat){
+    listingCategory=cat;
+    document.getElementById('lCatRealty').classList.toggle('active',cat==='realty');
+    document.getElementById('lCatAuto').classList.toggle('active',cat==='auto');
+  }
+
+  function recalcListing(){
+    const price=parseFloat(document.getElementById('lPrice').value)||0;
+    const down=parseFloat(document.getElementById('lDown').value)||0;
+    const months=parseInt(document.getElementById('lMonths').value)||1;
+    const monthly = Math.round((price-down)/months);
+    document.getElementById('lMonthlyPreview').textContent = monthly>0 ? sum(monthly) : '—';
+  }
+
+  function previewListingPhotos(input){
+    const preview=document.getElementById('lPhotoPreview');
+    preview.innerHTML='';
+    listingPendingPhotos=Array.from(input.files);
+    listingPendingPhotos.forEach((file,i)=>{
+      const reader=new FileReader();
+      reader.onload=e=>{
+        const div=document.createElement('div');
+        div.innerHTML='<img src="'+e.target.result+'" class="w-full h-20 object-cover rounded-xl">';
+        preview.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+    document.getElementById('lPhotoArea').innerHTML='<i class="fa-solid fa-check text-emerald-500 text-xl mb-1 block"></i><p class="text-sm font-black text-emerald-600">'+listingPendingPhotos.length+' фото добавлено</p>';
+  }
+
+  async function publishListing(){
+    const title=document.getElementById('lTitle').value.trim();
+    const price=parseFloat(document.getElementById('lPrice').value);
+    const down=parseFloat(document.getElementById('lDown').value);
+    const months=parseInt(document.getElementById('lMonths').value);
+    if(!title||!price||!down||!months){toast('Заполните все обязательные поля');return}
+    const monthly=Math.round((price-down)/months);
+    spin(true,'Публикуем объявление...');
+    const{data:listing,error}=await sb.from('listings').insert({
+      seller_id:currentUser.id, category:listingCategory, title,
+      city:document.getElementById('lCity').value.trim(),
+      description:document.getElementById('lDesc').value.trim(),
+      price, down_payment:down, months, monthly_payment:monthly,
+      photo_urls:[]
+    }).select().single();
+    if(error){spin(false);toast('Ошибка: '+error.message);return}
+    if(listingPendingPhotos.length){
+      const urls=[];
+      for(const file of listingPendingPhotos){
+        const ext=file.name.split('.').pop();
+        const path=currentUser.id+'/'+listing.id+'/'+Date.now()+'.'+ext;
+        const{error:upErr}=await sb.storage.from('listing-photos').upload(path,file);
+        if(!upErr){
+          const{data:urlData}=sb.storage.from('listing-photos').getPublicUrl(path);
+          urls.push(urlData.publicUrl);
+        }
+      }
+      if(urls.length) await sb.from('listings').update({photo_urls:urls}).eq('id',listing.id);
+    }
+    listingPendingPhotos=[];
+    document.getElementById('lPhotoPreview').innerHTML='';
+    document.getElementById('lPhotoArea').innerHTML='<i class="fa-solid fa-camera text-slate-400 text-2xl mb-2 block"></i><p class="text-sm text-slate-400 font-bold">Нажмите чтобы добавить фото</p>';
+    ['lTitle','lCity','lDesc','lPrice','lDown','lMonths'].forEach(id=>document.getElementById(id).value='');
+    spin(false);
+    toast('Объявление опубликовано ✓');
+    loadListings();go('feed');
+  }
+
+  // ─── CREATE DEAL FLOW ───────────────────────────────
+  function prepCreateDeal(){
+    if(!currentListing) return;
+    const l=currentListing;
+    document.getElementById('dDealSummary').innerHTML = `
+      <div class="flex justify-between mb-1"><span class="text-slate-400">${l.title}</span><span class="font-black">${sum(l.price)}</span></div>
+      <div class="flex justify-between mb-1"><span class="text-slate-400">Первый взнос</span><span class="font-black">${sum(l.down_payment)}</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">Ежемесячно (${l.months} мес)</span><span class="font-black text-blue-600">${sum(l.monthly_payment)}</span></div>
+    `;
+    document.getElementById('dStartDate').valueAsDate = new Date();
+    go('createDeal');
+  }
+
+  function goToContractGen(){
+    const buyerPhone=document.getElementById('dBuyerPhone').value.trim();
+    const buyerName=document.getElementById('dBuyerName').value.trim();
+    const startDate=document.getElementById('dStartDate').value;
+    if(!buyerPhone||!buyerName||!startDate){toast('Заполните все поля');return}
+    currentDealDraft = {
+      listing_id: currentListing.id,
+      title: currentListing.title,
+      category: currentListing.category,
+      price: currentListing.price,
+      down_payment: currentListing.down_payment,
+      months: currentListing.months,
+      monthly_payment: currentListing.monthly_payment,
+      buyer_phone: buyerPhone,
+      buyer_name: buyerName,
+      start_date: startDate
+    };
+    document.getElementById('contractChoice').classList.remove('hidden');
+    document.getElementById('contractLoading').classList.add('hidden');
+    document.getElementById('contractResult').classList.add('hidden');
+    document.getElementById('contractActions').classList.add('hidden');
+    go('contractGen');
+  }
+
+  async function generateAIContract(){
+    const d=currentDealDraft;
+    if(!d) return;
+    document.getElementById('contractChoice').classList.add('hidden');
+    document.getElementById('contractLoading').classList.remove('hidden');
+    try {
+      const session=await sb.auth.getSession();
+      const token=session.data.session?.access_token;
+      const response=await fetch('https://rnimbshvrvsdhewecovu.supabase.co/functions/v1/generate-contract',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({deal:{...d, seller_email:currentUser?.email||''}})
+      });
+      const data=await response.json();
+      const text=data.contract||data.error||'Не удалось составить договор.';
+      currentDealDraft.contract_text=text;
+      document.getElementById('contractBody').textContent=text;
+      document.getElementById('contractLoading').classList.add('hidden');
+      document.getElementById('contractResult').classList.remove('hidden');
+      document.getElementById('contractActions').classList.remove('hidden');
+    } catch(e){
+      document.getElementById('contractLoading').classList.add('hidden');
+      document.getElementById('contractChoice').classList.remove('hidden');
+      toast('Ошибка генерации договора');
+    }
+  }
+
+  function payServiceFee(){ go('serviceFee'); }
+
+  async function confirmDealCreation(){
+    const d=currentDealDraft;
+    if(!d) return;
+    spin(true,'Создаём сделку...');
+    // NOTE: buyer must already be registered; for MVP we look up by phone in profiles
+    const{data:buyerProfile}=await sb.from('profiles').select('id').eq('phone',d.buyer_phone).maybeSingle();
+    const buyerId = buyerProfile?.id || currentUser.id; // fallback for MVP testing
+    const{data:deal,error}=await sb.from('deals').insert({
+      listing_id:d.listing_id, seller_id:currentUser.id, buyer_id:buyerId,
+      title:d.title, category:d.category, price:d.price, down_payment:d.down_payment,
+      months:d.months, monthly_payment:d.monthly_payment, start_date:d.start_date,
+      contract_text:d.contract_text||'', status:'active', service_fee_paid:true, subscription_active:true
+    }).select().single();
+    if(error){spin(false);toast('Ошибка: '+error.message);return}
+    // generate payment schedule
+    const payments=[];
+    const start=new Date(d.start_date);
+    payments.push({deal_id:deal.id, payment_number:0, due_date:d.start_date, amount:d.down_payment, status:'pending'});
+    for(let i=1;i<=d.months;i++){
+      const due=new Date(start); due.setMonth(due.getMonth()+i);
+      payments.push({deal_id:deal.id, payment_number:i, due_date:due.toISOString().slice(0,10), amount:d.monthly_payment, status:'pending'});
+    }
+    await sb.from('payments').insert(payments);
+    await sb.from('listings').update({status:'reserved'}).eq('id',d.listing_id);
+    currentDealDraft=null;
+    spin(false);
+    toast('Сделка создана и активирована ✓');
+    loadMyDeals();go('mydeals');
+  }
+
+  // ─── MY DEALS ───────────────────────────────────────
+  async function loadMyDeals(){
+    const{data}=await sb.from('deals').select('*').or('seller_id.eq.'+currentUser.id+',buyer_id.eq.'+currentUser.id).order('created_at',{ascending:false});
+    renderDeals(data||[]);
+  }
+
+  function renderDeals(deals){
+    const box=document.getElementById('dealsBox');
+    if(!deals.length){
+      box.innerHTML='<div class="py-16 text-center"><div class="w-16 h-16 rounded-3xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-file-contract text-2xl"></i></div><p class="font-black mb-1">Сделок пока нет</p><p class="text-sm text-slate-500">Разместите объявление или откликнитесь на чьё-то.</p></div>';
+      return;
+    }
+    box.innerHTML='';
+    deals.forEach(d=>{
+      const card=document.createElement('div');
+      card.className='card p-4 cursor-pointer';
+      card.onclick=()=>openDeal(d.id);
+      const role = d.seller_id===currentUser.id ? 'Вы продавец' : 'Вы покупатель';
+      card.innerHTML=`
+        <div class="flex justify-between items-start mb-2">
+          <span class="badge ${d.category==='realty'?'badge-realty':'badge-auto'}">${role}</span>
+          <span class="text-[11px] text-slate-400 font-bold">${d.status==='active'?'Активна':d.status}</span>
+        </div>
+        <p class="font-black">${d.title}</p>
+        <div class="flex justify-between items-end mt-3">
+          <p class="text-lg font-black text-blue-600">${sum(d.price)}</p>
+          <p class="text-xs text-slate-500">${d.months} мес · ${sum(d.monthly_payment)}/мес</p>
+        </div>`;
+      box.appendChild(card);
+    });
+  }
+
+  async function openDeal(id){
+    const{data:d}=await sb.from('deals').select('*').eq('id',id).single();
+    if(!d) return;
+    currentDealView=d;
+    const{data:payments}=await sb.from('payments').select('*').eq('deal_id',id).order('payment_number');
+    const paid = (payments||[]).filter(p=>p.status==='paid').reduce((a,b)=>a+Number(b.amount),0);
+    const total = Number(d.price);
+    let paymentsHtml = (payments||[]).map(p=>{
+      const label = p.payment_number===0 ? 'Первый взнос' : 'Платёж '+p.payment_number;
+      const dateStr = new Date(p.due_date).toLocaleDateString('ru-RU');
+      let icon='<i class="fa-solid fa-circle text-slate-300"></i>', rowClass='';
+      if(p.status==='paid'){ icon='<i class="fa-solid fa-check text-emerald-500"></i>'; }
+      else if(new Date(p.due_date) < new Date()){ icon='<i class="fa-solid fa-triangle-exclamation text-red-500"></i>'; rowClass='bg-red-50 rounded-xl px-2'; }
+      return `<div class="flex items-center justify-between py-2 ${rowClass}">
+        <div class="flex items-center gap-2">${icon}<span class="text-sm">${label} · ${dateStr}</span></div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-black">${sum(p.amount)}</span>
+          ${p.status!=='paid' ? `<button onclick="markPaid('${p.id}')" class="ghost text-[10px]">Отметить</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    document.getElementById('dealDetailBody').innerHTML = `
+      <div class="card p-5 mb-4">
+        <p class="font-black text-lg mb-1">${d.title}</p>
+        <p class="text-xs text-slate-400 mb-3">Договор от ${new Date(d.created_at).toLocaleDateString('ru-RU')}</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-slate-50 rounded-xl p-3 text-center"><p class="text-lg font-black">${sum(total)}</p><p class="text-[11px] text-slate-400">Всего</p></div>
+          <div class="bg-emerald-50 rounded-xl p-3 text-center"><p class="text-lg font-black text-emerald-600">${sum(paid)}</p><p class="text-[11px] text-emerald-600">Оплачено</p></div>
+          <div class="bg-slate-50 rounded-xl p-3 text-center"><p class="text-lg font-black">${sum(total-paid)}</p><p class="text-[11px] text-slate-400">Остаток</p></div>
+        </div>
+      </div>
+      <div class="card p-4 mb-4">
+        <p class="font-black mb-2">График платежей</p>
+        ${paymentsHtml}
+      </div>
+      <button onclick="go('leaveReview')" class="secondary">Оценить контрагента</button>
+    `;
+    go('dealDetail');
+  }
+
+  async function markPaid(paymentId){
+    await sb.from('payments').update({status:'paid', paid_at:new Date().toISOString(), marked_by:currentUser.id}).eq('id',paymentId);
+    toast('Платёж отмечен ✓');
+    openDeal(currentDealView.id);
+  }
+
+  function downloadDealContract(){
+    const d=currentDealView;
+    if(!d) return;
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Договор ${d.title}</title><style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#0f172a;font-size:14px;line-height:1.7;white-space:pre-line}h1{text-align:center;font-size:20px}</style></head><body><h1>ДОГОВОР РАССРОЧКИ</h1>${d.contract_text||'Договор не был составлен через ИИ'}</body></html>`;
+    const blob=new Blob([html],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='Договор_'+d.title.replace(/\s+/g,'_')+'.html';
+    a.click();URL.revokeObjectURL(url);
+  }
+
+  // ─── PROFILE ────────────────────────────────────────
+  async function loadProfile(){
+    const{data:p}=await sb.from('profiles').select('*').eq('id',currentUser.id).single();
+    const ratingStars = '★'.repeat(Math.round(p?.rating||5)) + '☆'.repeat(5-Math.round(p?.rating||5));
+    document.getElementById('profileBody').innerHTML = `
+      <div class="card p-5 mb-4 text-center">
+        <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3"><i class="fa-solid fa-user text-2xl"></i></div>
+        <p class="font-black">${currentUser.email}</p>
+        <p class="text-xs text-slate-400 mt-1">${p?.phone||'Телефон не указан'}</p>
+        <p class="stars mt-2">${ratingStars} <span class="text-slate-400 text-xs">(${p?.total_deals||0} сделок)</span></p>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="card p-4 text-center"><p class="text-xl font-black text-emerald-600">${p?.on_time_payments||0}</p><p class="text-xs text-slate-400">Вовремя</p></div>
+        <div class="card p-4 text-center"><p class="text-xl font-black text-red-500">${p?.late_payments||0}</p><p class="text-xs text-slate-400">Просрочки</p></div>
+      </div>
+    `;
+  }
+
+  // ─── INIT ───────────────────────────────────────────
+  async function init(){
+    spin(true,'Загрузка...');
+    const{data:{session}}=await sb.auth.getSession();
+    if(session?.user){
+      currentUser=session.user;
+      document.getElementById('feedAuthBtn').innerHTML='<i class="fa-solid fa-user-check"></i>';
+    }
+    await loadListings();
+    spin(false);
+    go('feed');
+    sb.auth.onAuthStateChange((_,session)=>{ if(session?.user){ currentUser=session.user; } });
+  }
+  init();
+</script>
+</body>
+</html>
